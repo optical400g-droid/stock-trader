@@ -1,7 +1,7 @@
 """
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║          APEX MARKET INTELLIGENCE — v3.0                                     ║
-║          UI Overhaul · Backtesting · Auto-Refresh · Deep AI                  ║
+║          APEX MARKET INTELLIGENCE — v3.0                                    ║
+║          UI Overhaul · Backtesting · Auto-Refresh · Deep AI                 ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 import streamlit as st
@@ -370,45 +370,7 @@ NITTER_INSTANCES = [
     "https://nitter.privacydev.net",
 ]
 
-
 DEFAULT_SUBREDDITS = sorted(set([
-    # REDDIT EMAIL
-    "NIBS_Stock", "smallstreebets", "Stocks_Picks","TheRaceTo10Million",
-    "Investing_discussion", "stockstobuytoday","Trading",
-    "options","tastytrade","NextMoveStocks",
-
-    # High-Risk / Active Trading
-    "wallstreetbets", "daytrading", "options", "pennystocks",
-    "ShortSqueeze", "TradingRooms", "TradeIdeas", "StocksToBuy",
-    "CheapStocks", "ETFMemeStocks",
-
-    # Stock & Market Analysis
-    "stocks", "StockMarket", "EquityResearch", "CorporateFinance",
-    "Market_Research", "WallStreet",
-
-    # Long-Term / Value Investing
-    "investing", "valueinvesting", "dividends", "bogleheads",
-    "ETFs", "financialindependence", "Retirement", "PortfolioManagement",
-    "RealEstateInvesting",
-
-    # Algorithmic / Quantitative Trading
-    "QuantTrading", "AlgorithmicTrading", "optionsanalytics", "FXTrading",
-
-    # Regional & Specialized Markets
-    "IndianStockMarket", "InvestingEurope", "KShares", "VentureCapital",
-    "Cryptomarkets", "BTC",
-
-    # Macro / Economics & Supporting Communities
-    "EconomicCollapse", "EconomicTheory", "DataIsBeautiful", "AskEconomics",
-    "Business", "Finance", "PersonalFinance", "Tax", "FinTech",
-
-    # Growth & Innovation
-    "StockPicks", "TradeIdeas", "QuantumComputing", "InvestingTech",
-
-    # Energy / Renewable / Nuclear
-    "Energy", "renewableenergy", "solar", "nuclear", "CleanEnergyInvesting",
-    "OilAndGasInvesting",
-
     "wallstreetbets", "stocks", "investing", "StockMarket", "options",
     "daytrading", "pennystocks", "valueinvesting", "dividends",
     "SecurityAnalysis", "FinancialIndependence", "ETFs", "Bogleheads",
@@ -418,32 +380,11 @@ DEFAULT_SUBREDDITS = sorted(set([
     "CryptoMarkets", "BTC", "Trading", "StockPicks",
 ]))
 
-DEFAULT_TWITTER = sorted(set([
-    # Core Finance / Trading
-    "BespokeInvest", "MarketWatch", "RedDogT3", "investorslive",
-    "markflowchatter", "OptionsHawk", "Ritholtz", "howardlindzon",
-    "sjosephburns", "I_Am_The_ICT",
-
-    # Additional High-Value / Specialized
-    "CNBCnow", "zerohedge", "SJosephBurns", "TaviCosta", 
-    "MktOutperform", "CharlieBilello", "PeterLBrandt", "FriedbergMkt",
-    "OptionsSavvy",
-
-    # Growth & Innovation / Tech
-    "InvestingTech", "ARKInvest", "CathieDWood", 
-
-    # Energy / Renewable / Nuclear
-    "TheEnergyGang", "greentechmedia", "RenewableNow", "CleanTechnica", 
-
-    # Quantum / Emerging Tech
-    "IBMQuantum", "RigettiComputing",
-
+DEFAULT_TWITTER = [
     "MarketWatch", "CNBCnow", "zerohedge", "OptionsHawk",
     "CharlieBilello", "PeterLBrandt", "TaviCosta", "Ritholtz",
     "BespokeInvest", "MktOutperform", "ARKInvest", "CathieDWood",
-]))
-
-
+]
 
 DEFAULT_TICKERS = [
     "AAPL","MSFT","GOOGL","AMZN","META","NVDA","TSLA","AVGO","AMD","ARM",
@@ -488,34 +429,197 @@ for key, val in {
     "alerts_run":       False,
     "last_refresh":     None,
     "refresh_count":    0,
+    "gemini_api_key":   "",
+    "gemini_validated": False,
+    "gemini_model_obj": None,
 }.items():
     if key not in st.session_state:
         st.session_state[key] = val
 
 # ──────────────────────────────────────────────────────────────────────────────
-# GEMINI
+# GEMINI — user-supplied key (works on Streamlit Cloud with no secrets needed)
 # ──────────────────────────────────────────────────────────────────────────────
-@st.cache_resource
-def get_gemini_model():
+
+def _resolve_api_key() -> str:
+    """
+    Priority order:
+    1. Key entered by user in the UI this session
+    2. GEMINI_API_KEY from st.secrets (set by host / Streamlit Cloud env var)
+    3. Empty string → no key available
+    """
+    if st.session_state.get("gemini_api_key"):
+        return st.session_state["gemini_api_key"].strip()
     try:
-        if "GEMINI_API_KEY" not in st.secrets:
-            return None
-        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-        return genai.GenerativeModel("gemini-2.5-flash")
-    except Exception as e:
-        logger.error("Gemini init: %s", e)
+        return st.secrets.get("GEMINI_API_KEY", "")
+    except Exception:
+        return ""
+
+def get_gemini_model():
+    """Return a live GenerativeModel or None. Uses session-scoped key."""
+    key = _resolve_api_key()
+    if not key:
         return None
+    # Rebuild model if key changed since last call
+    cached_key = st.session_state.get("_gemini_key_used", "")
+    if st.session_state.get("gemini_model_obj") is None or cached_key != key:
+        try:
+            genai.configure(api_key=key)
+            model = genai.GenerativeModel("gemini-2.5-flash")
+            st.session_state["gemini_model_obj"] = model
+            st.session_state["_gemini_key_used"]  = key
+        except Exception as e:
+            logger.error("Gemini init: %s", e)
+            st.session_state["gemini_model_obj"] = None
+    return st.session_state.get("gemini_model_obj")
+
+def validate_gemini_key(key: str) -> tuple[bool, str]:
+    """Send a cheap test request to verify the key works. Returns (ok, message)."""
+    if not key or len(key) < 20:
+        return False, "Key looks too short — please double-check."
+    try:
+        genai.configure(api_key=key.strip())
+        m = genai.GenerativeModel("gemini-2.5-flash")
+        resp = m.generate_content("Reply with the single word: OK")
+        if resp and resp.text:
+            return True, "✅ API key validated successfully!"
+        return False, "Key accepted but model returned empty response."
+    except Exception as e:
+        msg = str(e)
+        if "API_KEY_INVALID" in msg or "invalid" in msg.lower():
+            return False, "❌ Invalid API key — please check and re-enter."
+        if "quota" in msg.lower():
+            return False, "⚠️ Key valid but quota exceeded on your account."
+        return False, f"❌ Error: {msg}"
 
 def call_gemini(prompt: str, max_chars: int = 30_000) -> str:
     model = get_gemini_model()
     if not model:
-        return "⚠️ Gemini API key not configured."
-    prompt = prompt[:max_chars]
+        return (
+            "⚠️ **Gemini API key not set.**\n\n"
+            "Enter your key in the **sidebar → 🔑 API Key** section, then retry."
+        )
     try:
-        resp = model.generate_content(prompt)
+        resp = model.generate_content(prompt[:max_chars])
         return resp.text if resp and resp.text else "No response from model."
     except Exception as e:
-        return f"Gemini error: {e}"
+        err = str(e)
+        if "API_KEY_INVALID" in err:
+            st.session_state["gemini_validated"] = False
+            return "❌ API key rejected. Please re-enter a valid key in the sidebar."
+        return f"Gemini error: {err}"
+
+def render_api_key_sidebar():
+    """
+    Sidebar widget for entering and validating the Gemini API key.
+    Called once near the top of sidebar rendering.
+    """
+    st.sidebar.markdown("---")
+    st.sidebar.markdown(
+        '<div style="font-family:\'JetBrains Mono\',monospace;font-size:0.68rem;'
+        'color:#475569;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">'
+        '🔑 Gemini API Key</div>',
+        unsafe_allow_html=True,
+    )
+
+    current_key = st.session_state.get("gemini_api_key", "")
+    display_key = current_key  # show full key so user can edit; masked by password type
+
+    new_key = st.sidebar.text_input(
+        "API Key",
+        value=current_key,
+        type="password",
+        placeholder="AIza...",
+        label_visibility="collapsed",
+        key="api_key_input",
+    )
+
+    col_save, col_clear = st.sidebar.columns(2)
+    with col_save:
+        if st.button("Save & Test", key="api_save", use_container_width=True):
+            if new_key.strip():
+                with st.spinner("Validating…"):
+                    ok, msg = validate_gemini_key(new_key.strip())
+                st.session_state["gemini_api_key"]   = new_key.strip() if ok else current_key
+                st.session_state["gemini_validated"]  = ok
+                st.session_state["gemini_model_obj"]  = None  # force rebuild
+                if ok:
+                    st.sidebar.success(msg)
+                else:
+                    st.sidebar.error(msg)
+            else:
+                st.sidebar.warning("Enter a key first.")
+    with col_clear:
+        if st.button("Clear", key="api_clear", use_container_width=True):
+            st.session_state["gemini_api_key"]  = ""
+            st.session_state["gemini_validated"] = False
+            st.session_state["gemini_model_obj"] = None
+            st.rerun()
+
+    # Status indicator
+    key_active = bool(_resolve_api_key())
+    if key_active and st.session_state.get("gemini_validated"):
+        st.sidebar.markdown(
+            '<div style="font-family:\'JetBrains Mono\',monospace;font-size:0.7rem;'
+            'color:#34d399;margin-top:4px;">● Key active &amp; validated</div>',
+            unsafe_allow_html=True,
+        )
+    elif key_active:
+        st.sidebar.markdown(
+            '<div style="font-family:\'JetBrains Mono\',monospace;font-size:0.7rem;'
+            'color:#fbbf24;margin-top:4px;">● Key set (not yet tested)</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        # Check if a host-level secret exists
+        try:
+            host_key = st.secrets.get("GEMINI_API_KEY", "")
+        except Exception:
+            host_key = ""
+        if host_key:
+            st.sidebar.markdown(
+                '<div style="font-family:\'JetBrains Mono\',monospace;font-size:0.7rem;'
+                'color:#34d399;margin-top:4px;">● Using host-configured key</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.sidebar.markdown(
+                '<div style="font-family:\'JetBrains Mono\',monospace;font-size:0.7rem;'
+                'color:#f87171;margin-top:4px;">● No key — AI features disabled</div>',
+                unsafe_allow_html=True,
+            )
+
+    st.sidebar.markdown(
+        '<div style="font-family:\'JetBrains Mono\',monospace;font-size:0.65rem;'
+        'color:#334155;margin-top:6px;">Key is stored in your browser session only.<br>'
+        'Get a free key at <a href="https://aistudio.google.com/app/apikey" '
+        'target="_blank" style="color:#38bdf8;">aistudio.google.com</a></div>',
+        unsafe_allow_html=True,
+    )
+    st.sidebar.markdown("---")
+
+def render_no_key_banner():
+    """Show a helpful onboarding banner when no AI key is present."""
+    key_present = bool(_resolve_api_key())
+    if key_present:
+        return  # nothing to show
+
+    st.markdown("""
+    <div style="background:linear-gradient(135deg,#071422,#0a1f35);border:1px solid #1e3a5f;
+    border-left:4px solid #38bdf8;border-radius:8px;padding:20px 24px;margin:12px 0 20px;">
+    <div style="font-family:'Syne',sans-serif;font-size:1.05rem;font-weight:700;color:#38bdf8;margin-bottom:8px;">
+    🔑 Add your Gemini API Key to unlock AI features</div>
+    <div style="font-family:'Space Grotesk',sans-serif;font-size:0.88rem;color:#94a3b8;line-height:1.6;">
+    All market data, charts, screener, backtester, options flow, and portfolio tracker work without a key.<br>
+    AI-powered features (report generation, trade commentary, news sentiment, deep dive analysis) require a
+    <strong style="color:#e2e8f0;">free Gemini API key</strong>.<br><br>
+    <strong style="color:#e2e8f0;">How to get one (free):</strong><br>
+    1. Visit <a href="https://aistudio.google.com/app/apikey" target="_blank"
+       style="color:#38bdf8;">aistudio.google.com/app/apikey</a><br>
+    2. Sign in with Google → click <em>Create API Key</em><br>
+    3. Copy the key and paste it into the <strong style="color:#e2e8f0;">🔑 Gemini API Key</strong> field in the sidebar → click <em>Save &amp; Test</em>
+    </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # TECHNICAL INDICATORS
@@ -2026,63 +2130,81 @@ Posts:
 # ──────────────────────────────────────────────────────────────────────────────
 # SIDEBAR + ROUTING
 # ──────────────────────────────────────────────────────────────────────────────
-st.sidebar.markdown('<div style="font-family:\'Syne\',sans-serif;font-size:1.1rem;font-weight:800;'
-                    'background:linear-gradient(135deg,#38bdf8,#818cf8);-webkit-background-clip:text;'
-                    '-webkit-text-fill-color:transparent;padding:8px 0 4px;">APEX.MI</div>',
-                    unsafe_allow_html=True)
-st.sidebar.markdown('<div style="font-family:\'JetBrains Mono\',monospace;font-size:0.65rem;'
-                    'color:#475569;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px;">'
-                    'Market Intelligence Platform</div>',unsafe_allow_html=True)
+st.sidebar.markdown(
+    '<div style="font-family:\'Syne\',sans-serif;font-size:1.1rem;font-weight:800;'
+    'background:linear-gradient(135deg,#38bdf8,#818cf8);-webkit-background-clip:text;'
+    '-webkit-text-fill-color:transparent;padding:8px 0 4px;">APEX.MI</div>',
+    unsafe_allow_html=True,
+)
+st.sidebar.markdown(
+    '<div style="font-family:\'JetBrains Mono\',monospace;font-size:0.65rem;'
+    'color:#475569;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px;">'
+    'Market Intelligence Platform</div>',
+    unsafe_allow_html=True,
+)
 
 PAGES = {
-    "🌐  Intelligence":     "AI Intelligence",
-    "📈  Screener":         "Screener",
-    "🔬  Deep Dive":        "Deep Dive",
-    "🎯  Options Flow":     "Options",
-    "🚨  Alert Engine":     "Alerts",
-    "💼  Portfolio":        "Portfolio",
-    "📰  News & Earnings":  "News",
-    "⚗️  Backtester":       "Backtest",
+    "🌐  Intelligence":    "AI Intelligence",
+    "📈  Screener":        "Screener",
+    "🔬  Deep Dive":       "Deep Dive",
+    "🎯  Options Flow":    "Options",
+    "🚨  Alert Engine":    "Alerts",
+    "💼  Portfolio":       "Portfolio",
+    "📰  News & Earnings": "News",
+    "⚗️  Backtester":      "Backtest",
 }
 
-page=st.sidebar.radio("",list(PAGES.keys()),label_visibility="collapsed")
-mode=PAGES[page]
-st.sidebar.markdown("---")
+page = st.sidebar.radio("", list(PAGES.keys()), label_visibility="collapsed")
+mode = PAGES[page]
 
-# Sidebar controls
+# ── API key widget (always visible) ─────────────────────────────
+render_api_key_sidebar()
+
+# ── Per-page sidebar controls ───────────────────────────────────
 subs=[]; users=[]; limit=25; fetch_btn=False
 max_pe=150; min_div=0.; show_buy=False; custom_raw=""
 
-if mode=="AI Intelligence":
-    st.sidebar.markdown('<div class="section-sub" style="padding:0 4px;">⚙️ SCRAPER SETTINGS</div>',unsafe_allow_html=True)
-    subs =st.sidebar.multiselect("Subreddits",DEFAULT_SUBREDDITS,default=DEFAULT_SUBREDDITS[:6])
-    users=st.sidebar.multiselect("Twitter",DEFAULT_TWITTER,default=DEFAULT_TWITTER[:4])
-    limit=st.sidebar.slider("Posts/source",1000,10000,1000)
-    fetch_btn=st.sidebar.button("🔍 Fetch Data",type="primary")
+if mode == "AI Intelligence":
+    st.sidebar.markdown(
+        '<div class="section-sub" style="padding:0 4px;">⚙️ SCRAPER SETTINGS</div>',
+        unsafe_allow_html=True,
+    )
+    subs      = st.sidebar.multiselect("Subreddits", DEFAULT_SUBREDDITS, default=DEFAULT_SUBREDDITS[:6])
+    users     = st.sidebar.multiselect("Twitter",    DEFAULT_TWITTER,    default=DEFAULT_TWITTER[:4])
+    limit     = st.sidebar.slider("Posts/source", 5, 100, 25)
+    fetch_btn = st.sidebar.button("🔍 Fetch Data", type="primary")
 
-elif mode=="Screener":
-    st.sidebar.markdown('<div class="section-sub" style="padding:0 4px;">⚙️ FILTERS</div>',unsafe_allow_html=True)
-    show_buy  =st.sidebar.checkbox("BUY signals only",False)
-    max_pe    =st.sidebar.slider("Max Fwd P/E",0,300,150)
-    min_div   =st.sidebar.slider("Min Div Yield %",0.,10.,0.)
-    custom_raw=st.sidebar.text_area("Extra tickers","COIN,MSTR,RKLB,IONQ")
+elif mode == "Screener":
+    st.sidebar.markdown(
+        '<div class="section-sub" style="padding:0 4px;">⚙️ FILTERS</div>',
+        unsafe_allow_html=True,
+    )
+    show_buy   = st.sidebar.checkbox("BUY signals only", False)
+    max_pe     = st.sidebar.slider("Max Fwd P/E", 0, 300, 150)
+    min_div    = st.sidebar.slider("Min Div Yield %", 0., 10., 0.)
+    custom_raw = st.sidebar.text_area("Extra tickers", "COIN,MSTR,RKLB,IONQ")
 
-elif mode in ("Deep Dive","Options","Backtest"):
-    custom_raw=st.sidebar.text_input("Ticker","NVDA")
+elif mode in ("Deep Dive", "Options", "Backtest"):
+    custom_raw = st.sidebar.text_input("Ticker", "NVDA")
 
 # ── Render header + ticker strip ────────────────────────────────
 render_header()
 with st.spinner(""):
-    ov=fetch_market_overview()
+    ov = fetch_market_overview()
 render_ticker_strip(ov)
 st.markdown("")
 
-# ── Page dispatch ───────────────────────────────────────────────
-if   mode=="AI Intelligence": render_ai_intelligence(subs,users,limit,fetch_btn)
-elif mode=="Screener":         render_screener_page(show_buy,max_pe,min_div,custom_raw)
-elif mode=="Deep Dive":        render_deep_dive(custom_raw)
-elif mode=="Options":          render_options_page()
-elif mode=="Alerts":           render_alerts_page()
-elif mode=="Portfolio":        render_portfolio_page()
-elif mode=="News":             render_news_earnings_page()
-elif mode=="Backtest":         render_backtest_page()
+# ── No-key banner (shown on AI-heavy pages when key is absent) ──
+if mode in ("AI Intelligence", "🔬 Deep Dive", "📰 News & Earnings",
+            "Alerts", "Backtest"):
+    render_no_key_banner()
+
+# ── Page dispatch ────────────────────────────────────────────────
+if   mode == "AI Intelligence": render_ai_intelligence(subs, users, limit, fetch_btn)
+elif mode == "Screener":        render_screener_page(show_buy, max_pe, min_div, custom_raw)
+elif mode == "Deep Dive":       render_deep_dive(custom_raw)
+elif mode == "Options":         render_options_page()
+elif mode == "Alerts":          render_alerts_page()
+elif mode == "Portfolio":       render_portfolio_page()
+elif mode == "News":            render_news_earnings_page()
+elif mode == "Backtest":        render_backtest_page()
