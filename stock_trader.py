@@ -370,7 +370,46 @@ NITTER_INSTANCES = [
     "https://nitter.privacydev.net",
 ]
 
+
+
 DEFAULT_SUBREDDITS = sorted(set([
+    # REDDIT EMAIL
+    "NIBS_Stock", "smallstreebets", "Stocks_Picks","TheRaceTo10Million",
+    "Investing_discussion", "stockstobuytoday","Trading",
+    "options","tastytrade","NextMoveStocks",
+
+    # High-Risk / Active Trading
+    "wallstreetbets", "daytrading", "options", "pennystocks",
+    "ShortSqueeze", "TradingRooms", "TradeIdeas", "StocksToBuy",
+    "CheapStocks", "ETFMemeStocks",
+
+    # Stock & Market Analysis
+    "stocks", "StockMarket", "EquityResearch", "CorporateFinance",
+    "Market_Research", "WallStreet",
+
+    # Long-Term / Value Investing
+    "investing", "valueinvesting", "dividends", "bogleheads",
+    "ETFs", "financialindependence", "Retirement", "PortfolioManagement",
+    "RealEstateInvesting",
+
+    # Algorithmic / Quantitative Trading
+    "QuantTrading", "AlgorithmicTrading", "optionsanalytics", "FXTrading",
+
+    # Regional & Specialized Markets
+    "IndianStockMarket", "InvestingEurope", "KShares", "VentureCapital",
+    "Cryptomarkets", "BTC",
+
+    # Macro / Economics & Supporting Communities
+    "EconomicCollapse", "EconomicTheory", "DataIsBeautiful", "AskEconomics",
+    "Business", "Finance", "PersonalFinance", "Tax", "FinTech",
+
+    # Growth & Innovation
+    "StockPicks", "TradeIdeas", "QuantumComputing", "InvestingTech",
+
+    # Energy / Renewable / Nuclear
+    "Energy", "renewableenergy", "solar", "nuclear", "CleanEnergyInvesting",
+    "OilAndGasInvesting",
+
     "wallstreetbets", "stocks", "investing", "StockMarket", "options",
     "daytrading", "pennystocks", "valueinvesting", "dividends",
     "SecurityAnalysis", "FinancialIndependence", "ETFs", "Bogleheads",
@@ -380,11 +419,30 @@ DEFAULT_SUBREDDITS = sorted(set([
     "CryptoMarkets", "BTC", "Trading", "StockPicks",
 ]))
 
-DEFAULT_TWITTER = [
+DEFAULT_TWITTER = sorted(set([
+    # Core Finance / Trading
+    "BespokeInvest", "MarketWatch", "RedDogT3", "investorslive",
+    "markflowchatter", "OptionsHawk", "Ritholtz", "howardlindzon",
+    "sjosephburns", "I_Am_The_ICT",
+
+    # Additional High-Value / Specialized
+    "CNBCnow", "zerohedge", "SJosephBurns", "TaviCosta", 
+    "MktOutperform", "CharlieBilello", "PeterLBrandt", "FriedbergMkt",
+    "OptionsSavvy",
+
+    # Growth & Innovation / Tech
+    "InvestingTech", "ARKInvest", "CathieDWood", 
+
+    # Energy / Renewable / Nuclear
+    "TheEnergyGang", "greentechmedia", "RenewableNow", "CleanTechnica", 
+
+    # Quantum / Emerging Tech
+    "IBMQuantum", "RigettiComputing",
+
     "MarketWatch", "CNBCnow", "zerohedge", "OptionsHawk",
     "CharlieBilello", "PeterLBrandt", "TaviCosta", "Ritholtz",
     "BespokeInvest", "MktOutperform", "ARKInvest", "CathieDWood",
-]
+]))
 
 DEFAULT_TICKERS = [
     "AAPL","MSFT","GOOGL","AMZN","META","NVDA","TSLA","AVGO","AMD","ARM",
